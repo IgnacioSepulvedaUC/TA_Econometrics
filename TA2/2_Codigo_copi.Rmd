@@ -1,0 +1,461 @@
+---
+title: "Codigo ayudantia 2"
+author: ''
+date: '2022-09-09'
+output:
+  pdf_document: default
+  html_document: default
+---
+
+Codigo de ayudantia de hoy, cualquier cosa me escriben *mail:* [ignacio.sepulveda.l@usach.cl] *cel:*+569 68484764
+
+Siempre que comencemos en R studio, dos cosas que es bueno tener claro. La primera es que el ambiente de trabajo se encuentra limpio y la otra es que tener claridad en que el directorio en el que trabajamos es el correcto.
+
+Para saber en que directorio esta los datos, una forma es ingresar al explorador de archivos(file explorer) dirigirse a la carpeta donde se encuentra nuestro archivo y damos click derecho sobre donde apunta la flecha roja.
+
+![](directorio.PNG)
+
+Si esta trabajando en archivo .R, que es el común, copie solo el código para obtener los resultados.
+
+```{r,message=FALSE,warning=FALSE}
+## Directorio
+
+## Limpiamos el ambiente
+rm(list=ls()) 
+
+## Nos da el directorio actual
+getwd() 
+### Escogemos el directorio, aquí deberían estar los datos,
+### esto cambiara de pc en pc.Ver la imagen para saber como
+### reconocer en cual directorio esta actualmente el archivo.
+setwd("C:/Users/IgnacioSepulveda/Documents/Ayudantias/econometrics") 
+## Checkeamos que efectivamente sea el directorio
+getwd()
+
+## Librerias a usar
+
+## En caso de que no esten instalados los paquetes, corre sin el # inicial
+#install.packages(c("haven","tidyverse","car")) 
+library("haven")
+library("tidyverse")
+library("car")
+```
+# Respuesta 1
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+![](2_ex1.PNG)
+
+Primero definimos las variables relevantes,
+
+```{r}
+muestra=500 #muestra de personas
+estadistico_t=0.75 # estadistico t
+error_estandar=0.2 # error estandar
+```
+
+\newpage
+
+Antes de hacer cualquier test necesitamos saber cual es nuestro $\hat\beta1$ estimado a partir de la muestra.
+
+Sabemos que el estadístico t es igual a,
+
+$$t=\frac{\hat\beta_1}{SE(\hat\beta_1)}$$
+
+Cuando $H_0:\beta_1=0\:\text{vs}\: H_1:\beta_1\neq0$, entonces basta con reemplazar y hacer el calculo.
+
+$$0.75=\frac{\beta_1}{0.2}\rightarrow\beta_1=0.75*0.2$$ Lo que nos da,
+
+```{r}
+beta_1=0.75*0.2
+beta_1
+```
+
+Cuando es un test de dos colas, rechazamos cuando el valor absoluto del estadístico t es mayor al t critico.
+
+Definimos las variables que nos faltan,
+
+```{r}
+beta_jefe=1 # beta a testear
+alpha=0.05 # significancia
+```
+
+Finalmente evaluamos.
+
+```{r}
+# La funcion 
+t_calculado=(beta_1-beta_jefe)/error_estandar
+t_critico=qt(1-alpha/2,muestra-2)
+print(paste("t_critico",round(t_critico,3),",t_caculado",abs(t_calculado)))
+if (abs(t_calculado)>t_critico) 'Rechazamos' else 'No podemos Rechazar'
+```
+
+Osea no existe evidencia en la muestra de que $\beta_1=1$.
+
+# Respuesta 2
+
+![](2_ex2.PNG)
+
+## Respuesta a)
+
+Primero cargamos los datos
+
+```{r}
+rm(list=ls())
+df=read_dta("FERTIL2.dta")
+```
+
+Estimamos los parámetros de la regresión.
+
+```{r}
+regresion=lm(children~educ,data=df) ## Este comando solo nos muestra 
+                                    ## los parámetros estimados.
+regresion
+```
+
+\newpage
+
+```{r}
+regresion %>% summary() ## Este nos muestra mas datos que nos pueden interesar
+```
+
+Finalmente armamos la ecuación.
+
+$$\widehat{Children}=3.495-0.209Educ$$
+
+## Respuesta b)
+
+Necesitamos ahora los intervalos de confianza, usamos una función de R.
+
+Rechazamos si el valor que buscamos no se encuentra en el intervalo.
+
+```{r}
+significancia=0.05
+confint(regresion,"educ",1-significancia)
+
+```
+
+```{r}
+## Llegamos al mismo valor si lo calculamos a mano
+beta_estimado=coef(regresion)[2] ## BETA ESTIMADO
+sd=sqrt(diag(vcov(regresion)))[2] ## ERROR ESTANDAR
+n=length(regresion$residuals) ## TAMAÑO DE LA MUESTRA
+t_critico=qt(1-significancia/2,n-2) ## T estadistico
+
+
+paste(significancia*100/2,"%: ",               # Limite 
+      round(beta_estimado-t_critico*sd,7),     # Inferior
+      100-significancia*100/2,"%: ",           # Limite
+      round(beta_estimado+sd*t_critico,7))     # Superior
+```
+
+Rechazamos dado que no se encuentra el cero, por lo tanto nuestra variable es significativa. Osea que existe evidencia de que nos ayuda a explicar la cantidad de hijos.
+
+## Respuesta c)
+
+La primera forma de obtenerlo a través de la regresión.
+
+```{r}
+summary(regresion)$coefficients[2,4] ## Esto nos permite rescatar el p-value desde                                       ## la regresion calculada
+```
+
+Y otra forma es calcularlo con una función de R.
+
+```{r}
+beta_estimado=coef(regresion)[2] ## Obtenemos el beta de la regresion 
+sd=sqrt(diag(vcov(regresion)))[2] ## El error estandar
+estadistico_t=beta_estimado/sd ## El estadistico t
+tamano_muestra=length(df$educ)
+pt(estadistico_t,tamano_muestra-2)*2 ## El p-value
+```
+
+Como el p-value es menor a 0.05 volvemos a confirmar que la nula se rechaza.
+
+## Respuesta d)
+
+Ocupamos la funcion LinearHypothesis del paquete car para hacer test de dos colar y testeamos si $\beta_{educ}=3$. Si el p-value es menor a 0.05 podemos rechazar la nula.
+
+```{r}
+# La funcion 
+beta_test=3
+linearHypothesis(regresion,paste("educ=",beta_test))
+```
+
+Y ocupamos la función intervalos de confianza creada.
+
+```{r}
+significancia=0.05
+confint(regresion,"educ",1-significancia)
+```
+
+\newpage
+
+Que pasa si reemplazamos los limites del intervalo en la función linearHypothesis?
+
+```{r}
+beta_test=-0.225256
+linearHypothesis(regresion,paste("educ=",beta_test))
+## Lo mismo dara si ocupamos el limite superior
+```
+
+
+## Respuesta e)
+
+Yo quiero encontrar evidencia para ver si el $\beta_{educ}$ es negativo, osea que mientras mas educación menos hijos. Entonces para encontrar evidencia debo rechazar que es positivo. 
+
+$$H_0:\beta_{educ}\ge0\:o\;\beta_{educ}=0\:\text{vs}\:H_1:\beta_{educ}<0$$
+
+Recordemos que la regla para cuando tenemos en la nula $\beta \ge 0$ , es que el t calculado tiene que ser menor que -1 por el t critico.
+
+$$
+t_{calculado}\le -t^c
+$$
+
+En ese caso podemos rechazar.
+
+```{r}
+# La funcion 
+beta_test=0
+t_calculado=(beta_estimado-beta_test)/sd
+t_critico=qt(1-significancia/2,tamano_muestra-2)
+if (t_calculado<-t_critico) 'Rechazamos' else 'No podemos Rechazar'
+```
+
+Osea existe evidencia para afirmar que la educación afecta de forma negativa en la cantidad de hijos.
+
+# Extra: Gráficos en R.
+
+Ocuparemos dos paquetes el primeros es el base y el segundo es ggplot. Y usaremos la misma base de datos de recién
+
+```{r}
+rm(list=ls())
+## Librerias a usar
+library(car)
+library("haven")
+library("tidyverse")
+```
+
+```{r}
+## La base
+df=read_dta("FERTIL2.dta")
+```
+
+```{r}
+## Primero revisamos los datos
+df %>% str()
+```
+
+\newpage
+
+## Gráficos de Barras.
+
+Gráfiquemos un gráficos de barras que contendrá el promedio de hijos para mujeres con y sin radio.
+
+```{r}
+
+df %>% ## Los datos
+  
+  select(radio,children) %>% ## Selecciona variables a usar
+  
+  na.omit() %>% ## Elimina los nas
+  
+  mutate(radio=factor(radio,labels=c('Tiene Radio','No tiene Radio'))) %>% 
+  ## Hace que la variable raido sea categorica 
+  
+  group_by(radio) %>% ## Agrupa por los que tienen y no tiene radio.
+  
+  summarise(hijos=mean(children)) %>% ## Calcula la media de hijos para c/ grupo.
+  
+  ggplot(aes(x=radio,y=hijos)) + ## Marco general donde estara el grafico
+  
+  geom_bar(stat='identity',fill='lightblue',color='blue') + ## La figura que se                                                                 ## grafica 
+  
+  ggtitle("Promedio de hijos para mujeres con y sin radio") + ## Titulo
+  
+  xlab("") + ## Dejamos la x-axis vacío dado que ya tiene info
+  
+  ylab("Promedio de hijos")+
+  
+  theme_bw() ## El fondo del grafico
+```
+
+## Histogramas
+
+Haremos histogramas para la distribución de la edad de mujeres.
+
+```{r}
+df %>% ## Los datos
+
+  ggplot(aes(x=age)) + ## El marco general
+  
+  geom_histogram(fill='lightblue',color='blue') + ## Histogram
+  
+  ggtitle("Histograma edad") + ## Titulo
+  
+  xlab('Edad') + ## x-axis 
+  
+  ylab('Frecuencia') +## y-axis
+  
+  theme_bw() ## El fondo del grafico
+
+
+
+```
+
+Vemos ahora la diferencia entre las mujeres que tiene y no tiene hijos.
+
+```{r}
+df %>% ## Los datos
+  
+  mutate(Tiene_hijos=children>0) %>%  ## Creamos una variable que sera V si tiene 
+                                      ## hijos y F si no tiene hijos.
+  ggplot(aes(x=age,fill=Tiene_hijos)) + ## El marco general
+  
+  geom_histogram() + ## Histogram
+  
+  ggtitle("Histograma edad") + ## Titulo
+  
+  xlab('Edad') + ## x-axis 
+  
+  ylab('Frecuencia') +## y-axis
+  
+  theme_bw() ## El fondo del grafico
+
+```
+
+El tema es que no se ve muy bien.
+
+## Gráficos de Caja.
+
+El gráfico de caja puede ayudar en parte a ver mejor esas diferencias.
+
+```{r}
+df %>% ## Los datos
+  
+  mutate(Tiene_hijos=children>0) %>%  ## Creamos una variable que sera V si tiene 
+                                      ## hijos y F si no tiene hijos.
+  
+  ggplot(aes(x=Tiene_hijos,y=age,fill=Tiene_hijos)) + ## El marco general
+  
+  geom_boxplot() + ## Histogram
+  
+  ggtitle("Boxplot edad") + ## Boxplot
+  
+  xlab('Tiene Hijos') + ## x-axis 
+  
+  ylab('Edad') + ## y-axis
+  
+  theme_bw() ## El fondo del grafico
+```
+
+El tema es que no tenemos claro que esta pasando en las orillas de la distribución. Para eso una mejor idea es el gráfico de violín.
+
+## Gráficos de Violín.
+
+En este gráfico queda mucho mas claro donde se concentran los datos.
+
+```{r}
+df %>% ## Los datos
+  
+  mutate(Tiene_hijos=children>0) %>%  ## Creamos una variable que sera V si tiene 
+                                      ## hijos y F si no tiene hijos.
+  
+  ggplot(aes(x=Tiene_hijos,y=age,fill=Tiene_hijos)) + ## El marco general
+  
+  geom_violin() + ## Violin
+  
+  ggtitle("Violin edad") + ## Titulo
+  
+  xlab('Tiene Hijos') + ## x-axis 
+  
+  ylab('Edad') +## y-axis
+  
+  theme_bw() ## El fondo del grafico
+```
+
+## Scatter plot.
+
+Veamos como se ve la relación que modelamos en la pregunta dos. Este es el gráfico clasico para evaluar dos variables continuas.
+
+```{r}
+df %>% ## Datos
+  
+  ggplot(aes(x=educ,y=children))+ ## Marco general
+  
+  geom_point(color='steelblue') + ## Puntos
+  
+  xlab("Educacion") + ## x-axis
+  
+  ylab("Cantidad de hijos") +
+  
+  ggtitle("Scatter plot") +
+  
+  theme_bw() ## El fondo del grafico
+
+```
+
+## Scatter plot : Incluyendo la regresión.
+
+```{r}
+df %>% ## Datos
+  
+  ggplot(aes(x=educ,y=children))+ ## Marco general
+  
+  geom_point(color='steelblue') + ## Puntos
+  
+  geom_smooth(method='lm',se=FALSE)+ ## Regresion
+  
+  xlab("Educacion") + ## x-axis
+  
+  ylab("Cantidad de hijos") + ## y-axis
+  
+  ggtitle("Scatter plot: Linea de regresión") +
+  
+  theme_bw() ## El fondo del grafico
+```
+
+## Scatter plot: Incluyendo intervalos de confianza.
+
+```{r}
+df %>% ## Datos
+  
+  ggplot(aes(x=educ,y=children))+ ## Marco general
+  
+  geom_point(color='steelblue') + ## Puntos
+  
+  geom_smooth(method='lm',se=TRUE,level=.99)+ ## Regresion
+  
+  xlab("Educacion") + ## x-axis
+  
+  ylab("Cantidad de hijos") + ## y-axis
+  
+  ggtitle("Scatter plot: Intervalo de confianza") +
+  
+  theme_bw() ## El fondo del grafico
+```
+
+## Scatter plot: Una tercera variable.
+
+```{r}
+df %>% ## Datos
+  
+  mutate(evermarr=factor(evermarr,
+                         labels=c('No Casado','Casado'))) %>% 
+  ## Convertimos a categoría la variable tv
+  
+  ggplot(aes(x=educ,y=children,color=evermarr))+ ## Marco general
+  
+  geom_point() + ## Puntos
+  
+  #geom_smooth(method='lm',se=TRUE,level=.95)+ ## Regresion
+  
+  xlab("Educacion") + ## x-axis
+  
+  ylab("Cantidad de hijos") + ## y-axis
+  
+  ggtitle("Scatter plot: Intervalo de confianza") +
+  
+  theme_bw() ## El fondo del grafico
+```
