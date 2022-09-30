@@ -1,0 +1,204 @@
+---
+title: "Ayudantia 6"
+output: pdf_document
+date: '2022-10-01'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Resultados
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+library(tidyverse)
+library(haven)
+library(readr)
+```
+
+Lo primero que hacemos es ajustar el escritorio.
+
+```{r}
+getwd()
+setwd("C:/Users/IgnacioSepulveda/Documents/Ayudantias/econometrics")
+```
+
+## Resultados 1
+
+![](3_ex1.PNG)
+
+Primero cargamos los datos
+
+```{r}
+df=read_dta('BWGHT.DTA')
+```
+
+Después armamos la regresión
+
+```{r}
+modelo=lm(lbwght~cigs+lfaminc+parity+male,data=df)
+```
+
+### a)
+
+```{r}
+modelo
+```
+
+$\beta_1$: Si el número de cigarrillos diarios que consume la madre durante el embarazo **aumenta** en 1 unidad, se espera que el peso del bebé a nacer **disminuya** en promedio un 0.4%, considerando que el resto de los factores no varía.
+
+$\beta_2$: Si la renta de la familia **aumenta** en un 1%, se espera que el peso del bebé a nacer **aumente** en promedio un 0.018%, considerando que el resto de los factores no varía.
+
+$\beta_4$: El peso del bebé al nacer es en promedio un 2,6% **mayor si el bebé es hombre que si es mujer**, cuando ambas madres consumieron el mismo número de cigarrillos durante el embarazo, la renta familiar es la misma y ambos nacieron en el mismo orden (**con el resto de las características incluidas en el modelo iguales**).
+
+### b)
+
+Lo que tenemos que hacer es multiplicar el $beta$ de cigs por la cantidad extra de cigarros fumados de forma diaria,
+
+```{r}
+## Cuanto cigarros mas fumara
+cambio_cigs=10 
+
+## con $coeff.. podemos obtener el valor de los coeficientes del modelo
+beta_cigs=modelo$coefficients[2]
+
+## Calculamos....
+cambio_lbwght=beta_cigs*cambio_cigs
+paste0('El efecto de fumar 10 cigarrillos mas al dia es una caída estimada de un :',
+       round(cambio_lbwght*100,2),
+       '% en el peso del bebe')
+```
+
+### c)
+
+Según la estimación, pesan en promedio un 2,6% más los niños que las niñas con las mismas características.
+
+Para ver si es significativa vemos los p value de la tabla.
+
+```{r}
+modelo_detalle=modelo %>% summary()
+modelo_detalle
+```
+
+Dado que p-value es 0.009 podemos rechazar la hipótesis nula incluso al 1% de significancia.
+
+Otra forma es con el t crítico,
+
+```{r}
+## El t_calculado es el beta_gorro/se(beta_gorro)
+t_calculado_male=modelo_detalle$coefficients[5,3] 
+## Obtenemos la col=3 que es el t_value, 
+## de la fila=5 que es male
+
+## El t_critico de la distribución t-student
+alpha=0.05
+
+## El total de datos que tenemos(n)
+total_muestra=dim(df)[1]
+
+## El total de parámetros(k+1)
+total_beta=length(modelo$coefficients)
+
+## La función que no entrega el quantil
+t_critico_male=qt(p = 1-alpha/2, ## 1-alpha/2
+                  df = total_muestra-total_beta) ## n-k-1
+##tvalue
+tvalue=paste('t calculado',
+         round(t_calculado_male,2),
+         ' y t critico',
+         round(t_critico_male,2))
+
+## Si t_cal>t_cri rechazamos...
+if(t_calculado_male>t_critico_male){ ## si pasa esto
+   paste('Rechazamos, la diferencia es significativa.',tvalue) ## imprimirá esto
+  } else{ ## si no paso lo anterior
+  paste('No rechazamos que sea igual a 0.',tvalue) ## imprimirá esto otro
+  }
+```
+
+## Respuesta 2
+
+![](3_ex2.PNG)
+
+Dado que los trabajadores menos hábiles tienen mayores posibilidades de ser seleccionados para el programa, la variable "train" va a estar correlacionada con el error y por tanto, el estimador MCO de $\beta_1$ va a estar sesgado. Si asumimos que $\beta_4$ corresponde al parametro poblabicional de la habilidad del trabajador, el signo del sesgo está determinado por:
+
+$$E(\hat\beta_1)=\beta_1+\beta_4\frac{Cov(train,habilidad)}{Var(train)}$$ $$E(\hat\beta_1)-\beta_1=\beta_4\frac{Cov(train,habilidad)}{Var(train)}=Sesgo(\hat\beta_1)$$
+
+Del cual se desprende que el sesgo será negativo, ya que a mayor habilidad se espera que mayor sea el salario, mientras que la correlación entre la "habilidad" y la variable "train" es negativa, dado que a menor habilidad mayor probabilidad de ser seleccionado para el programa. Por tanto, el estimador MCO de $\beta_1$ va a estar subestimando el valor real de $\beta_1$, es decir, se estará subestimando el efecto que el programa tiene en el salario.
+
+![](matrix%20de%20correlacion.PNG)
+
+## Respuesta 3
+
+![](3_ex3.PNG)
+
+Primero cargamos los datos
+
+```{r,waning=FALSE,message=FALSE}
+df=read_delim('Viviendas2.csv',delim = ";")
+```
+
+Corremos la regresión
+
+```{r}
+modelo=lm(precio~area+Dormitorios+Estacionamiento,data=df)
+modelo
+```
+
+### a)
+
+La diferencia viene dada por el coeficiente que acompaña a la variable estacionamiento, que nos dice que en promedio la diferencia entre las viviendas con y sin departamento es de 281.3 UFs.
+
+Para predecir ocuparemos una función de R,
+
+```{r}
+area=60 #Area
+dorm=2 #Dormitorios
+est=0 #Estacionamiento
+df_predict=data.frame('area'=area,'Dormitorios'=dorm,'Estacionamiento'=est) # Dataframe
+valor_predicho=modelo %>% predict(newdata=df_predict) ## Predecimos
+paste("El valor predicho promedio de una vivienda con esas caracteristicas es de",
+      round(valor_predicho,2),
+      'UF')
+```
+
+### b)
+
+Aquí queremos encontrar evidencia de si $\beta_3$ es mayor a 0, entonces debo rechazar el caso contrario.
+
+Por lo tanto nuestra hipótesis quedara $H_0:\beta_3\le0\:\text{o}\:\beta_3=0\: \text{vs}\:H_1:\beta_3>0$
+
+```{r}
+modelo_detalle=modelo %>% summary()
+## El t_calculado es el beta_gorro/se(beta_gorro)
+t_calculado_est=modelo_detalle$coefficients[4,3] 
+## Obtenemos la col=3 que es el t_value, 
+## de la fila=4 que es estacionamiento
+
+## El t_critico de la distribución t-student
+alpha=0.05
+
+## El total de datos que tenemos(n)
+total_muestra=dim(df)[1]
+
+## El total de parámetros(k+1)
+total_beta=length(modelo$coefficients)
+
+## La función que no entrega el quantil
+t_critico_est=qt(p = 1-alpha, ## 1-alpha
+                  df = total_muestra-total_beta) ## n-k-1
+
+## Si t_cal>t_cri rechazamos...
+tvalue=paste('t calculado',
+         round(t_calculado_est,2),
+         ' y t critico',
+         round(t_critico_est,2))
+         
+if(t_calculado_est>t_critico_est){ ## si pasa esto
+   paste('Rechazamos, la diferencia es significativa.',tvalue) ## imprimirá esto
+  } else{ ## si no paso lo anterior
+  paste('No rechazamos que sea igual a 0 ',tvalue) ## imprimirá esto otro
+  }
+```
+
+Por lo tanto, dado que $t > t_c$ se rechaza H0 con un nivel de significancia del 5%. Es decir, en base a la muestra, hay evidencia suficiente para afirmar que las viviendas que tienen estacionamiento cuestan más que aquellas que no lo tienen, con un nivel de significancia del 5%.
